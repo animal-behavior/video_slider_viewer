@@ -71,6 +71,7 @@ class VideoPlayer(QMainWindow):
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setEnabled(False)
         self.slider.sliderMoved.connect(self.slider_changed)
+        self.slider.setFocusPolicy(Qt.StrongFocus)  # Ensure the slider can take keyboard focus
         navigation_layout.addWidget(self.slider)
 
         # Frame Range Input
@@ -103,6 +104,10 @@ class VideoPlayer(QMainWindow):
         container = QWidget()
         container.setLayout(main_layout)
         self.setCentralWidget(container)
+
+        # Set focus to the main window for keyboard events
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setFocus()
 
     def open_video(self):
         try:
@@ -212,11 +217,9 @@ class VideoPlayer(QMainWindow):
                         x = int(float(str(row_data[x_col].values[0]).replace(u'\xa0', u'')))
                         y = int(float(str(row_data[y_col].values[0]).replace(u'\xa0', u'')))
 
-                        # Cycle through colors based on the index of the label
+                        # Draw the dot (adjust for OpenCV's coordinate system)
                         color = self.colors[index % len(self.colors)]
-
-                        # Draw the dot
-                        cv2.circle(frame, (x, y), 5, color, -1)  # Colored dot
+                        cv2.circle(frame, (x, y), 10, color, -1)
 
                         # Draw the label text next to the dot
                         label_x = x + 10  # Offset the label slightly
@@ -231,6 +234,21 @@ class VideoPlayer(QMainWindow):
                 self.frame_label.setPixmap(QPixmap.fromImage(qimg))
         except Exception as e:
             self.show_error_message(f"Error showing frame: {e}")
+
+    def keyPressEvent(self, event):
+        """Handle key press events for the slider navigation."""
+        if event.key() == Qt.Key_Right:  # Right arrow key
+            new_value = self.slider.value() + 1
+            if new_value <= self.max_frame:
+                self.slider.setValue(new_value)
+                self.show_frame(new_value)
+        elif event.key() == Qt.Key_Left:  # Left arrow key
+            new_value = self.slider.value() - 1
+            if new_value >= self.min_frame:
+                self.slider.setValue(new_value)
+                self.show_frame(new_value)
+        else:
+            super().keyPressEvent(event)
 
     def show_error_message(self, message):
         msg = QMessageBox()
