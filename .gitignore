@@ -2,7 +2,7 @@ csv/
 image/
 mini_test/
 *.docx
-video_verification/
+video_slider_viewer/
 *.mp4
 *.csv
 *.csv#

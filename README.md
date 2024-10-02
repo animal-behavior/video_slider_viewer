@@ -1,7 +1,10 @@
-## Установка и запуск:
+## Установка:
 1. ```python -m venv video_slider_viewer```
 2. ```pip install -r requirements.txt```
-3. ```python video_slider_viewer.py```
+
+## Запуск:
+1. ```pip install -r requirements.txt``` (если зависимости обновлялись)
+2. ```python video_slider_viewer.py```
 
 ## Как пользоваться:
 1. Загрузите видео
