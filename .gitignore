@@ -6,3 +6,5 @@ video_slider_viewer/
 *.mp4
 *.csv
 *.csv#
+dist/
+*.spec
