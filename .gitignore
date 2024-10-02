@@ -4,3 +4,5 @@ mini_test/
 *.docx
 video_verification/
 *.mp4
+*.csv
+*.csv#
