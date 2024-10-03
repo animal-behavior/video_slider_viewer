@@ -2,8 +2,18 @@ import sys
 import cv2
 import pandas as pd
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QLabel, QSlider, QVBoxLayout, QHBoxLayout, QPushButton,
-    QWidget, QFileDialog, QFormLayout, QSpinBox, QMessageBox
+    QApplication,
+    QMainWindow,
+    QLabel,
+    QSlider,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QWidget,
+    QFileDialog,
+    QFormLayout,
+    QSpinBox,
+    QMessageBox,
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QImage, QPixmap
@@ -12,7 +22,7 @@ from PyQt5.QtGui import QImage, QPixmap
 class VideoPlayer(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Video Frame Viewer with CSV Data")
+        self.setWindowTitle("Video Frame Viewer")
         self.setGeometry(200, 200, 800, 600)
 
         self.video_loaded = False
@@ -26,16 +36,16 @@ class VideoPlayer(QMainWindow):
 
         # Define colors for the dots (RGB format)
         self.colors = [
-            (255, 0, 0),    # Red
-            (0, 255, 0),    # Green
-            (0, 0, 255),    # Blue
+            (255, 0, 0),  # Red
+            (0, 255, 0),  # Green
+            (0, 0, 255),  # Blue
             (255, 255, 0),  # Yellow
             (255, 165, 0),  # Orange
             (0, 255, 255),  # Cyan
             (255, 0, 255),  # Magenta
             (128, 0, 128),  # Purple
             (0, 128, 128),  # Teal
-            (128, 128, 0)   # Olive
+            (128, 128, 0),  # Olive
         ]
 
         self.init_ui()
@@ -71,7 +81,9 @@ class VideoPlayer(QMainWindow):
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setEnabled(False)
         self.slider.sliderMoved.connect(self.slider_changed)
-        self.slider.setFocusPolicy(Qt.StrongFocus)  # Ensure the slider can take keyboard focus
+        self.slider.setFocusPolicy(
+            Qt.StrongFocus
+        )  # Ensure the slider can take keyboard focus
         navigation_layout.addWidget(self.slider)
 
         # Frame Range Input
@@ -112,7 +124,9 @@ class VideoPlayer(QMainWindow):
     def open_video(self):
         try:
             # Open file dialog to select video
-            video_file, _ = QFileDialog.getOpenFileName(self, "Open Video File", "", "Video Files (*.mp4 *.avi *.mkv)")
+            video_file, _ = QFileDialog.getOpenFileName(
+                self, "Open Video File", "", "Video Files (*.mp4 *.avi *.mkv)"
+            )
             if video_file:
                 self.video_cap = cv2.VideoCapture(video_file)
                 if not self.video_cap.isOpened():
@@ -136,7 +150,9 @@ class VideoPlayer(QMainWindow):
                 self.frame_label.setFixedSize(self.video_width, self.video_height)
 
                 # Set window size to fit the video resolution properly
-                self.resize(self.video_width, self.video_height + 150)  # Add some height for the controls
+                self.resize(
+                    self.video_width, self.video_height + 150
+                )  # Add some height for the controls
 
                 self.show_frame(self.min_frame)
 
@@ -146,7 +162,9 @@ class VideoPlayer(QMainWindow):
     def load_csv(self):
         try:
             # Open file dialog to select CSV file
-            csv_file, _ = QFileDialog.getOpenFileName(self, "Open CSV File", "", "CSV Files (*.csv)")
+            csv_file, _ = QFileDialog.getOpenFileName(
+                self, "Open CSV File", "", "CSV Files (*.csv)"
+            )
             if csv_file:
                 # Load CSV with pandas
                 self.csv_data = pd.read_csv(csv_file)
@@ -156,8 +174,8 @@ class VideoPlayer(QMainWindow):
                 columns = self.csv_data.columns
 
                 for i in range(1, len(columns), 2):  # Skip 'frame' column (0 index)
-                    if 'x' in columns[i].lower() and 'y' in columns[i + 1].lower():
-                        label = columns[i].replace('x', '').strip()
+                    if "x" in columns[i].lower() and "y" in columns[i + 1].lower():
+                        label = columns[i].lower().replace("_", "").replace("x", "").strip()
                         self.coordinates[label] = (columns[i], columns[i + 1])
 
                 print("Detected Coordinates Pairs:", self.coordinates)
@@ -209,22 +227,34 @@ class VideoPlayer(QMainWindow):
                 text_y = 30  # 30 pixels from the top
                 cv2.putText(frame, text, (text_x, text_y), font, font_scale, color, thickness, cv2.LINE_AA)
 
-                # If CSV data is available, plot the dots and add their labels
+                # If CSV data is available, plot the dots and connect them
                 if not self.csv_data.empty and frame_number in self.csv_data['frame'].values:
                     row_data = self.csv_data[self.csv_data['frame'] == frame_number]
 
+                    # List of points to connect with lines (order: crest -> hip -> knee -> ankle -> mtp -> toe)
+                    key_points = ['iliac crest', 'hip', 'knee', 'ankle', 'mtp', 'toe']
+                    points = []
+
                     for index, (label, (x_col, y_col)) in enumerate(self.coordinates.items()):
-                        x = int(float(str(row_data[x_col].values[0]).replace(u'\xa0', u'')))
-                        y = int(float(str(row_data[y_col].values[0]).replace(u'\xa0', u'')))
+                        if label in key_points:
+                            x = int(float(str(row_data[x_col].values[0]).replace(u'\xa0', u'')))
+                            y = int(float(str(row_data[y_col].values[0]).replace(u'\xa0', u'')))
+                            points.append((x, y))  # Add the point to the list
 
-                        # Draw the dot (adjust for OpenCV's coordinate system)
-                        color = self.colors[index % len(self.colors)]
-                        cv2.circle(frame, (x, y), 10, color, -1)
+                            # Draw the dot (adjust for OpenCV's coordinate system)
+                            color = self.colors[index % len(self.colors)]
+                            cv2.circle(frame, (x, y), 10, color, -1)
 
-                        # Draw the label text next to the dot
-                        label_x = x + 10  # Offset the label slightly
-                        label_y = y - 10
-                        cv2.putText(frame, label, (label_x, label_y), font, 0.7, color, 2)
+                            # Draw the label text next to the dot
+                            label_x = x + 10  # Offset the label slightly
+                            label_y = y - 10
+                            cv2.putText(frame, label, (label_x, label_y), font, 0.7, color, 2)
+
+                    # Connect the points with lines
+                    for i in range(len(points) - 1):
+                        start_point = points[i]
+                        end_point = points[i + 1]
+                        cv2.line(frame, start_point, end_point, (0, 255, 255), 2)  # Yellow line with thickness 2
 
                 # Convert the frame to QImage format and display it
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -232,6 +262,7 @@ class VideoPlayer(QMainWindow):
                 bytes_per_line = 3 * width
                 qimg = QImage(frame.data, width, height, bytes_per_line, QImage.Format_RGB888)
                 self.frame_label.setPixmap(QPixmap.fromImage(qimg))
+
         except Exception as e:
             self.show_error_message(f"Error showing frame: {e}")
 
