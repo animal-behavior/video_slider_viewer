@@ -26,4 +26,6 @@
 5. Ползунком переключайте кадры (номер текущего кадра отображается в правом верхнем углу)
 
 ## Сборка .exe файла:
-1. ```pyinstaller --onefile --windowed --icon=.\icon.ico .\video_slider_viewer.py```
+```
+pyinstaller --onefile --windowed --icon=.\icon.ico .\video_slider_viewer.py
+```
