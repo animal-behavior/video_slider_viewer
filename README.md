@@ -41,4 +41,3 @@ python video_slider_viewer.py
 ```
 pyinstaller --onefile --windowed --icon=.\icon.ico .\video_slider_viewer.py
 ```
-
