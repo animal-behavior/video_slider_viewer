@@ -8,3 +8,4 @@ slider/
 *.csv#
 dist/
 *.spec
+data/
