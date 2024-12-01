@@ -93,11 +93,12 @@ class VideoPlayer(QMainWindow):
         label_style = "QLabel { color : white; }"
 
         self.min_frame_input = QSpinBox(self)
-        self.min_frame_input.setMinimum(0)
+        self.min_frame_input.setMinimum(0)  # Allow frames starting from 0
+        self.min_frame_input.setMaximum(1000000)  # Set a large maximum value
         min_frame_label = QLabel("Min Frame:")
         min_frame_label.setStyleSheet(label_style)  # Set label to white
         form_layout.addRow(min_frame_label, self.min_frame_input)
-
+    
         self.max_frame_input = QSpinBox(self)
         max_frame_label = QLabel("Max Frame:")
         max_frame_label.setStyleSheet(label_style)  # Set label to white
@@ -188,9 +189,10 @@ class VideoPlayer(QMainWindow):
             self.min_frame = self.min_frame_input.value()
             self.max_frame = self.max_frame_input.value()
 
-            if self.min_frame >= self.max_frame:
-                self.max_frame = self.min_frame + 1
-                self.max_frame_input.setValue(self.max_frame)
+            # Ensure valid range: min_frame should be less than or equal to max_frame
+            if self.min_frame > self.max_frame:
+                QMessageBox.warning(self, "Invalid Range", "Minimum Frame must be less than or equal to Maximum Frame.")
+                return
 
             self.slider.setMinimum(self.min_frame)
             self.slider.setMaximum(self.max_frame)
