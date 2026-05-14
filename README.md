@@ -1,23 +1,14 @@
 ## Установка:
-1. Установите python3.10
+1. Установите [uv](https://docs.astral.sh/uv/)
 
-2. Создание виртуального окружения:
-```python
-python -m venv video_slider_viewer
+2. Установка зависимостей:
 ```
-3. Установка зависимостей:
-```
-pip install -r requirements.txt
+uv sync
 ```
 
 ## Запуск:
-1. Обновить зависимости:
 ```
-pip install -r requirements.txt
-```
-2. Запустить программу:
-```
-python video_slider_viewer.py
+uv run python video_slider_viewer.py
 ```
 
 ## Как пользоваться:
@@ -41,5 +32,6 @@ python video_slider_viewer.py
 
 ## Сборка .exe файла:
 ```
-pyinstaller --onefile --windowed --icon=.\icon.ico .\video_slider_viewer.py
+uv sync --extra build
+uv run pyinstaller --onefile --windowed --icon=.\icon.ico .\video_slider_viewer.py
 ```

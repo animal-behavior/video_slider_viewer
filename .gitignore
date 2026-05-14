@@ -8,3 +8,5 @@ slider/
 *.csv#
 dist/
 *.spec
+*.exe
+__pycache__
