@@ -1,3 +1,4 @@
+import re
 import sys
 import cv2
 import pandas as pd
@@ -28,6 +29,7 @@ class VideoPlayer(QMainWindow):
         self.video_loaded = False
         self.csv_data = pd.DataFrame()
         self.coordinates = {}
+        self.frame_set = set()
         self.video_cap = None
         self.current_frame = 0
         self.min_frame = 0
@@ -80,7 +82,7 @@ class VideoPlayer(QMainWindow):
         # Slider for frame navigation
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setEnabled(False)
-        self.slider.sliderMoved.connect(self.slider_changed)
+        self.slider.valueChanged.connect(self.slider_changed)
         self.slider.setFocusPolicy(
             Qt.StrongFocus
         )  # Ensure the slider can take keyboard focus
@@ -89,20 +91,13 @@ class VideoPlayer(QMainWindow):
         # Frame Range Input
         form_layout = QFormLayout()
 
-        # Style sheet for making labels white
-        label_style = "QLabel { color : white; }"
-
         self.min_frame_input = QSpinBox(self)
-        self.min_frame_input.setMinimum(0)  # Allow frames starting from 0
-        self.min_frame_input.setMaximum(1000000)  # Set a large maximum value
-        min_frame_label = QLabel("Min Frame:")
-        min_frame_label.setStyleSheet(label_style)  # Set label to white
-        form_layout.addRow(min_frame_label, self.min_frame_input)
-    
+        self.min_frame_input.setMinimum(0)
+        self.min_frame_input.setMaximum(1000000)
+        form_layout.addRow(QLabel("Min Frame:"), self.min_frame_input)
+
         self.max_frame_input = QSpinBox(self)
-        max_frame_label = QLabel("Max Frame:")
-        max_frame_label.setStyleSheet(label_style)  # Set label to white
-        form_layout.addRow(max_frame_label, self.max_frame_input)
+        form_layout.addRow(QLabel("Max Frame:"), self.max_frame_input)
 
         set_range_button = QPushButton("Set Frame Range")
         set_range_button.clicked.connect(self.set_frame_range)
@@ -129,13 +124,20 @@ class VideoPlayer(QMainWindow):
                 self, "Open Video File", "", "Video Files (*.mp4 *.avi *.mkv)"
             )
             if video_file:
+                if self.video_cap is not None:
+                    self.video_cap.release()
+
                 self.video_cap = cv2.VideoCapture(video_file)
                 if not self.video_cap.isOpened():
                     raise IOError("Could not open video file.")
 
                 self.total_frames = int(self.video_cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                self.max_frame_input.setMaximum(self.total_frames - 1)
-                self.max_frame_input.setValue(self.total_frames - 1)
+                self.min_frame = 0
+                self.max_frame = self.total_frames - 1
+
+                self.min_frame_input.setValue(self.min_frame)
+                self.max_frame_input.setMaximum(self.max_frame)
+                self.max_frame_input.setValue(self.max_frame)
 
                 self.video_loaded = True
                 self.slider.setEnabled(True)
@@ -143,17 +145,19 @@ class VideoPlayer(QMainWindow):
                 self.slider.setMaximum(self.max_frame)
                 self.slider.setValue(self.min_frame)
 
-                # Get video width and height for auto-resize
                 self.video_width = int(self.video_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 self.video_height = int(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-                # Adjust QLabel size to match video resolution
-                self.frame_label.setFixedSize(self.video_width, self.video_height)
-
-                # Set window size to fit the video resolution properly
-                self.resize(
-                    self.video_width, self.video_height + 150
-                )  # Add some height for the controls
+                # Cap window size to the available screen so 4K videos don't overflow.
+                screen = QApplication.primaryScreen().availableGeometry()
+                max_w = max(1, screen.width() - 80)
+                max_h = max(1, screen.height() - 200)
+                scale = min(max_w / self.video_width, max_h / self.video_height, 1.0)
+                target_w = int(self.video_width * scale)
+                target_h = int(self.video_height * scale)
+                self.frame_label.setMinimumSize(1, 1)
+                self.frame_label.setMaximumSize(target_w, target_h)
+                self.resize(target_w, target_h + 150)
 
                 self.show_frame(self.min_frame)
 
@@ -167,17 +171,22 @@ class VideoPlayer(QMainWindow):
                 self, "Open CSV File", "", "CSV Files (*.csv)"
             )
             if csv_file:
-                # Load CSV with pandas
-                self.csv_data = pd.read_csv(csv_file)
+                data = pd.read_csv(csv_file)
 
-                # Parse columns and identify pairs of x, y coordinates
-                self.coordinates = {}
-                columns = self.csv_data.columns
+                if 'frame' not in data.columns:
+                    raise ValueError("CSV must contain a 'frame' column as the frame index.")
 
-                for i in range(1, len(columns), 2):  # Skip 'frame' column (0 index)
+                coordinates = {}
+                columns = list(data.columns)
+
+                for i in range(1, len(columns) - 1, 2):
                     if "x" in columns[i].lower() and "y" in columns[i + 1].lower():
-                        label = columns[i].lower().replace("_", "").replace("x", "").strip()
-                        self.coordinates[label] = (columns[i], columns[i + 1])
+                        label = re.sub(r'[_ ]*x\s*$', '', columns[i].strip().lower()).strip()
+                        coordinates[label] = (columns[i], columns[i + 1])
+
+                self.csv_data = data
+                self.coordinates = coordinates
+                self.frame_set = set(data['frame'].tolist())
 
                 print("Detected Coordinates Pairs:", self.coordinates)
         except Exception as e:
@@ -229,57 +238,54 @@ class VideoPlayer(QMainWindow):
                 text_y = 30  # 30 pixels from the top
                 cv2.putText(frame, text, (text_x, text_y), font, font_scale, color, thickness, cv2.LINE_AA)
 
-                # If CSV data is available, plot the dots and connect them
-                if not self.csv_data.empty and frame_number in self.csv_data['frame'].values:
+                if self.coordinates and frame_number in self.frame_set:
                     row_data = self.csv_data[self.csv_data['frame'] == frame_number]
 
-                    # List of points to connect with lines (order: crest -> hip -> knee -> ankle -> mtp -> toe)
+                    # Connect joints in this anatomical order regardless of CSV column order.
                     key_points = ['iliac crest', 'hip', 'knee', 'ankle', 'mtp', 'toe']
                     points = []
 
-                    for index, (label, (x_col, y_col)) in enumerate(self.coordinates.items()):
-                        if label in key_points:
-                            x = int(float(str(row_data[x_col].values[0]).replace(u'\xa0', u'')))
-                            y = int(float(str(row_data[y_col].values[0]).replace(u'\xa0', u'')))
-                            points.append((x, y))  # Add the point to the list
+                    for index, label in enumerate(key_points):
+                        if label not in self.coordinates:
+                            continue
+                        x_col, y_col = self.coordinates[label]
+                        x = int(float(str(row_data[x_col].values[0]).replace(u'\xa0', u'')))
+                        y = int(float(str(row_data[y_col].values[0]).replace(u'\xa0', u'')))
+                        points.append((x, y))
 
-                            # Draw the dot (adjust for OpenCV's coordinate system)
-                            color = self.colors[index % len(self.colors)]
-                            cv2.circle(frame, (x, y), 10, color, -1)
+                        color = self.colors[index % len(self.colors)]
+                        cv2.circle(frame, (x, y), 10, color, -1)
+                        cv2.putText(frame, label, (x + 10, y - 10), font, 0.7, color, 2)
 
-                            # Draw the label text next to the dot
-                            label_x = x + 10  # Offset the label slightly
-                            label_y = y - 10
-                            cv2.putText(frame, label, (label_x, label_y), font, 0.7, color, 2)
-
-                    # Connect the points with lines
                     for i in range(len(points) - 1):
-                        start_point = points[i]
-                        end_point = points[i + 1]
-                        cv2.line(frame, start_point, end_point, (0, 255, 255), 2)  # Yellow line with thickness 2
+                        cv2.line(frame, points[i], points[i + 1], (0, 255, 255), 2)
 
                 # Convert the frame to QImage format and display it
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 height, width, channel = frame.shape
                 bytes_per_line = 3 * width
                 qimg = QImage(frame.data, width, height, bytes_per_line, QImage.Format_RGB888)
-                self.frame_label.setPixmap(QPixmap.fromImage(qimg))
+                pixmap = QPixmap.fromImage(qimg)
+                label_size = self.frame_label.size()
+                if label_size.width() > 0 and label_size.height() > 0:
+                    pixmap = pixmap.scaled(
+                        label_size, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                    )
+                self.frame_label.setPixmap(pixmap)
 
         except Exception as e:
             self.show_error_message(f"Error showing frame: {e}")
 
     def keyPressEvent(self, event):
         """Handle key press events for the slider navigation."""
-        if event.key() == Qt.Key_Right:  # Right arrow key
+        if event.key() == Qt.Key_Right:
             new_value = self.slider.value() + 1
             if new_value <= self.max_frame:
                 self.slider.setValue(new_value)
-                self.show_frame(new_value)
-        elif event.key() == Qt.Key_Left:  # Left arrow key
+        elif event.key() == Qt.Key_Left:
             new_value = self.slider.value() - 1
             if new_value >= self.min_frame:
                 self.slider.setValue(new_value)
-                self.show_frame(new_value)
         else:
             super().keyPressEvent(event)
 
@@ -300,4 +306,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     player = VideoPlayer()
     player.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
