@@ -9,7 +9,6 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -18,7 +17,7 @@ MAD_SCALE = 1.4826  # MAD-to-sigma assuming Gaussian noise
 DEFAULT_CHAIN = ["iliac_crest", "hip", "knee", "ankle", "mtp", "toe"]
 
 
-def normalize_label(name: str) -> Tuple[str, str | None]:
+def normalize_label(name: str) -> tuple[str, str | None]:
     """Return (joint_key, axis) where axis is 'x', 'y', or None for non-coordinate columns."""
     s = name.strip().lower()
     m = re.match(r'^(.+?)[ _]?([xy])\s*$', s)
@@ -28,9 +27,9 @@ def normalize_label(name: str) -> Tuple[str, str | None]:
     return base, m.group(2)
 
 
-def extract_joints(df: pd.DataFrame) -> Dict[str, Tuple[str, str]]:
+def extract_joints(df: pd.DataFrame) -> dict[str, tuple[str, str]]:
     """Map joint_key -> (x_column_name, y_column_name) for complete pairs only."""
-    pending: Dict[str, Dict[str, str]] = {}
+    pending: dict[str, dict[str, str]] = {}
     for col in df.columns:
         if col == "frame":
             continue
@@ -92,21 +91,21 @@ def per_joint_speed(df: pd.DataFrame, xc: str, yc: str) -> np.ndarray:
 
 def bone_length_outliers(
     df: pd.DataFrame,
-    joints: Dict[str, Tuple[str, str]],
-    chain: List[str],
+    joints: dict[str, tuple[str, str]],
+    chain: list[str],
     window: int,
     k: float,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Per-joint outlier masks from bone-length consistency along the chain."""
     n = len(df)
-    flags: Dict[str, np.ndarray] = {j: np.zeros(n, dtype=bool) for j in joints}
+    flags: dict[str, np.ndarray] = {j: np.zeros(n, dtype=bool) for j in joints}
     present = [j for j in chain if j in joints]
     if len(present) < 2:
         return flags
 
     speeds = {j: per_joint_speed(df, *joints[j]) for j in present}
 
-    bone_flags: List[Tuple[str, str, np.ndarray]] = []
+    bone_flags: list[tuple[str, str, np.ndarray]] = []
     for a, b in zip(present, present[1:]):
         xa, ya = joints[a]
         xb, yb = joints[b]
@@ -187,8 +186,8 @@ def main() -> int:
         df.loc[invalid, yc] = np.nan
 
     # frame_idx -> joint -> set of reasons (both axes get the same reasons)
-    outlier_idx: Dict[str, np.ndarray] = {j: np.zeros(n, dtype=bool) for j in joints}
-    reasons: Dict[Tuple[str, int], List[str]] = {}
+    outlier_idx: dict[str, np.ndarray] = {j: np.zeros(n, dtype=bool) for j in joints}
+    reasons: dict[tuple[str, int], list[str]] = {}
 
     def record(joint: str, frame_idx: int, reason: str) -> None:
         outlier_idx[joint][frame_idx] = True
@@ -255,7 +254,7 @@ def main() -> int:
     # 'nan' — leave as is.
 
     # Build outlier report rows (one row per axis per flagged frame)
-    report_rows: List[dict] = []
+    report_rows: list[dict] = []
     for (joint, frame_idx), why in reasons.items():
         for axis, col in zip(("x", "y"), joints[joint]):
             original_val = original.at[frame_idx, col]
